@@ -20,7 +20,13 @@ CLI utilities for orchestrating a self-hosted coding agent that runs on RunPod, 
 
 2. Create a `.context` directory with any repo notes you want in the model prompt.
 
-3. Initialize configuration (stores state in `.agent_state/`):
+3. Add your RunPod API key to a local `.env` file:
+
+   ```
+   RunPodAPIKey=YOUR_KEY_HERE
+   ```
+
+4. Initialize configuration (stores state in `.agent_state/`):
 
    ```bash
    poetry run self-hosted-agent config
@@ -28,31 +34,31 @@ CLI utilities for orchestrating a self-hosted coding agent that runs on RunPod, 
 
    You will be prompted for your RunPod API key and optional template ID/image/machine type.
 
-4. Build the local RAG index from `.context`:
+5. Build the local RAG index from `.context`:
 
    ```bash
    poetry run self-hosted-agent index
    ```
 
-5. Launch a workstation:
+6. Launch a workstation:
 
    ```bash
    poetry run self-hosted-agent launch
    ```
 
-6. Chat with the model (retrieval enabled by default):
+7. Chat with the model (retrieval enabled by default):
 
    ```bash
    poetry run self-hosted-agent chat "Summarize the repository layout"
    ```
 
-7. Periodically run the monitor to enforce idle shutdown (30-minute default):
+8. Periodically run the monitor to enforce idle shutdown (30-minute default):
 
    ```bash
    poetry run self-hosted-agent monitor
    ```
 
-8. Terminate the RunPod pod manually when finished:
+9. Terminate the RunPod pod manually when finished:
 
    ```bash
    poetry run self-hosted-agent shutdown

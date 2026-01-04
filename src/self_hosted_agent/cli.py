@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import typer
+from dotenv import load_dotenv
 from rich import print
 from rich.console import Console
 from rich.table import Table
@@ -30,7 +32,10 @@ from .runpod_manager import (
 )
 
 
+load_dotenv()
 app = typer.Typer(add_completion=False, help="Self-hosted coding agent CLI.")
+config_app = typer.Typer(add_completion=False, help="Configuration commands.")
+app.add_typer(config_app, name="config")
 console = Console()
 
 
@@ -44,9 +49,15 @@ def version_info() -> None:
     print(version)
 
 
-@app.command("config")
+@config_app.command("init")
 def init_config(
-    api_key: str = typer.Option(..., prompt=True, hide_input=True, help="RunPod API key"),
+    api_key: Optional[str] = typer.Option(
+        None,
+        "--api-key",
+        envvar="RunPodAPIKey",
+        help="RunPod API key (can be set via RunPodAPIKey env var or .env).",
+        show_envvar=True,
+    ),
     template_id: Optional[str] = typer.Option(
         None, help="Optional RunPod template ID for the workstation."
     ),
@@ -62,6 +73,11 @@ def init_config(
     ),
 ) -> None:
     """Initialize the agent config file."""
+    if not api_key:
+        raise typer.BadParameter(
+            "RunPod API key is required. Set RunPodAPIKey in your environment or .env file, "
+            "or pass --api-key explicitly."
+        )
     runpod_settings = RunPodSettings(
         api_key=api_key,
         template_id=template_id,
