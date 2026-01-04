@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable, List, Sequence
 
 import faiss
 import numpy as np
@@ -18,8 +18,27 @@ class RetrievedChunk:
     score: float
 
 
-def iter_text_files(root: Path) -> Iterable[Path]:
+DEFAULT_EXCLUDE_DIRS = {
+    ".git",
+    ".agent_state",
+    ".venv",
+    "venv",
+    "env",
+    "node_modules",
+    "__pycache__",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".pytest_cache",
+    "dist",
+    "build",
+}
+
+
+def iter_text_files(root: Path, exclude_dirs: Sequence[str] = DEFAULT_EXCLUDE_DIRS) -> Iterable[Path]:
+    exclude_set = set(exclude_dirs)
     for path in root.rglob("*"):
+        if any(part in exclude_set for part in path.parts):
+            continue
         if path.is_file() and path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".gif", ".mp4", ".mov", ".zip"}:
             yield path
 
@@ -52,19 +71,28 @@ def build_index(config: AgentConfig) -> None:
     texts: List[str] = []
     sources: List[str] = []
 
-    if not config.context_dir.exists():
+    roots: List[Path] = []
+    for code_dir in config.code_dirs:
+        candidate = Path(code_dir)
+        if candidate.exists():
+            roots.append(candidate)
+    if config.context_dir.exists():
+        roots.append(config.context_dir)
+
+    if not roots:
         raise FileNotFoundError(
-            f"Context directory {config.context_dir} not found. Add files to .context first."
+            "No source directories found to index. Configure code_dirs or create a .context directory."
         )
 
-    for file_path in iter_text_files(config.context_dir):
-        chunks = chunk_text(
-            file_path.read_text(encoding="utf-8", errors="ignore"),
-            max_chars=config.chunk_size,
-            overlap=config.chunk_overlap,
-        )
-        texts.extend(chunks)
-        sources.extend([str(file_path)] * len(chunks))
+    for root in roots:
+        for file_path in iter_text_files(root):
+            chunks = chunk_text(
+                file_path.read_text(encoding="utf-8", errors="ignore"),
+                max_chars=config.chunk_size,
+                overlap=config.chunk_overlap,
+            )
+            texts.extend(chunks)
+            sources.extend([str(file_path)] * len(chunks))
 
     if not texts:
         raise ValueError("No text files found in the context directory.")
