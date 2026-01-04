@@ -1,0 +1,31 @@
+[tool.poetry]
+name = "self-hosted-coding-agent"
+version = "0.1.0"
+description = "CLI utilities for orchestrating a self-hosted coding agent on RunPod with local context and RAG."
+authors = ["Automation Agent <agent@example.com>"]
+readme = "README.md"
+packages = [{ include = "self_hosted_agent", from = "src" }]
+
+[tool.poetry.dependencies]
+python = "^3.11"
+typer = {version = "^0.12.3", extras = ["all"]}
+rich = "^13.9.2"
+runpod = "^1.4.0"
+requests = "^2.32.3"
+sentence-transformers = "^3.2.1"
+faiss-cpu = "^1.8.0"
+pydantic = "^2.9.2"
+uvicorn = "^0.30.6"
+fastapi = "^0.115.0"
+openai = "^1.51.0"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.3.3"
+ruff = "^0.6.9"
+
+[tool.poetry.scripts]
+self-hosted-agent = "self_hosted_agent.cli:run"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
