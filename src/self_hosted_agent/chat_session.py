@@ -71,7 +71,8 @@ def build_prompt(
     config: AgentConfig, user_input: str, include_rag: bool
 ) -> tuple[list[dict], List[RetrievedChunk]]:
     history = load_history(config)
-    messages = [{"role": msg.role, "content": msg.content} for msg in history]
+    messages = [{"role": "system", "content": config.system_prompt}]
+    messages.extend([{"role": msg.role, "content": msg.content} for msg in history])
 
     retrieved: List[RetrievedChunk] = []
     if include_rag:
@@ -98,6 +99,9 @@ def send_chat(
         "model": config.model_name,
         "messages": messages,
         "stream": False,
+        "temperature": config.temperature,
+        "top_p": config.top_p,
+        "max_tokens": config.max_tokens,
     }
 
     response = requests.post(config.model_endpoint, json=payload, timeout=120)

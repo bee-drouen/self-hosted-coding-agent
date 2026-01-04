@@ -8,6 +8,7 @@ CLI utilities for orchestrating a self-hosted coding agent that runs on RunPod, 
 - Local-first chat logs and RAG index; nothing is uploaded except what you explicitly send to the model.
 - Default MCP server definitions for local terminal and filesystem control.
 - Automatic idle shutdown window (30 minutes by default) so pods do not stay alive when unused.
+- High-quality defaults for large codebases: larger RAG chunks with overlap, more retrieved neighbors, low-temperature generation, and a guiding system prompt that encourages grounded, stepwise answers.
 
 ## Quickstart
 
@@ -62,3 +63,8 @@ CLI utilities for orchestrating a self-hosted coding agent that runs on RunPod, 
 - MCP server configuration is written to `.agent_state/mcp-servers.json` and targets local shell and filesystem servers.
 - Chat history is stored locally in `.agent_state/chat_history.jsonl`.
 - The agent assumes a model endpoint compatible with the OpenAI Chat Completions API (for example, an open-source model served on the RunPod workstation). Update `model_endpoint` and `model_name` in `.agent_state/config.json` as needed.
+- Quality-oriented defaults (tunable in `.agent_state/config.json`):
+  - `model_name`: `qwen2.5-coder-32b-instruct` (strong reasoning for large repos).
+  - `system_prompt`: pushes grounded, stepwise answers with file-path citations.
+  - `temperature`/`top_p` set low (0.2/0.9) for focused outputs; `max_tokens` 2048 for longer replies.
+  - `chunk_size` 1200 with `chunk_overlap` 200 and `retrieval_k` 8 to improve recall across large codebases like 100K+ line monorepos.

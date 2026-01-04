@@ -13,6 +13,11 @@ DEFAULT_INDEX_PATH = DEFAULT_BASE_DIR / "rag.index"
 DEFAULT_STORE_PATH = DEFAULT_BASE_DIR / "documents.jsonl"
 DEFAULT_CHAT_LOG_PATH = DEFAULT_BASE_DIR / "chat_history.jsonl"
 DEFAULT_CONTEXT_DIR = Path(".context")
+DEFAULT_SYSTEM_PROMPT = (
+    "You are a meticulous coding agent assisting on a large monorepo. "
+    "Use only the provided context and prior chat history. "
+    "Cite file paths when referencing code, reason step-by-step, and avoid speculation."
+)
 
 
 @dataclass
@@ -35,9 +40,16 @@ class AgentConfig:
     index_path: Path = DEFAULT_INDEX_PATH
     store_path: Path = DEFAULT_STORE_PATH
     chat_log_path: Path = DEFAULT_CHAT_LOG_PATH
+    chunk_size: int = 1200
+    chunk_overlap: int = 200
+    retrieval_k: int = 8
     embedding_model: str = "sentence-transformers/all-MiniLM-L6-v2"
     model_endpoint: str = "http://localhost:11434/v1/chat/completions"
-    model_name: str = "mistralai/Mistral-7B-Instruct-v0.3"
+    model_name: str = "qwen2.5-coder-32b-instruct"
+    system_prompt: str = DEFAULT_SYSTEM_PROMPT
+    temperature: float = 0.2
+    top_p: float = 0.9
+    max_tokens: int = 2048
     auto_shutdown_minutes: int = 30
     runpod: Optional[RunPodSettings] = None
 
@@ -62,9 +74,16 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> AgentConfig:
         index_path=Path(data.get("index_path", DEFAULT_INDEX_PATH)),
         store_path=Path(data.get("store_path", DEFAULT_STORE_PATH)),
         chat_log_path=Path(data.get("chat_log_path", DEFAULT_CHAT_LOG_PATH)),
+        chunk_size=data.get("chunk_size", 1200),
+        chunk_overlap=data.get("chunk_overlap", 200),
+        retrieval_k=data.get("retrieval_k", 8),
         embedding_model=data.get("embedding_model", "sentence-transformers/all-MiniLM-L6-v2"),
         model_endpoint=data.get("model_endpoint", "http://localhost:11434/v1/chat/completions"),
-        model_name=data.get("model_name", "mistralai/Mistral-7B-Instruct-v0.3"),
+        model_name=data.get("model_name", "qwen2.5-coder-32b-instruct"),
+        system_prompt=data.get("system_prompt", DEFAULT_SYSTEM_PROMPT),
+        temperature=data.get("temperature", 0.2),
+        top_p=data.get("top_p", 0.9),
+        max_tokens=data.get("max_tokens", 2048),
         auto_shutdown_minutes=data.get("auto_shutdown_minutes", 30),
         runpod=runpod_settings,
     )
@@ -78,9 +97,16 @@ def save_config(config: AgentConfig, path: Path = DEFAULT_CONFIG_PATH) -> None:
         "index_path": str(config.index_path),
         "store_path": str(config.store_path),
         "chat_log_path": str(config.chat_log_path),
+        "chunk_size": config.chunk_size,
+        "chunk_overlap": config.chunk_overlap,
+        "retrieval_k": config.retrieval_k,
         "embedding_model": config.embedding_model,
         "model_endpoint": config.model_endpoint,
         "model_name": config.model_name,
+        "system_prompt": config.system_prompt,
+        "temperature": config.temperature,
+        "top_p": config.top_p,
+        "max_tokens": config.max_tokens,
         "auto_shutdown_minutes": config.auto_shutdown_minutes,
         "runpod": config.runpod.__dict__ if config.runpod else None,
     }

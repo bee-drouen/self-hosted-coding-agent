@@ -24,7 +24,7 @@ def iter_text_files(root: Path) -> Iterable[Path]:
             yield path
 
 
-def chunk_text(text: str, max_chars: int = 800) -> List[str]:
+def chunk_text(text: str, max_chars: int = 1200, overlap: int = 200) -> List[str]:
     lines = text.splitlines()
     chunks: List[str] = []
     current: List[str] = []
@@ -33,8 +33,13 @@ def chunk_text(text: str, max_chars: int = 800) -> List[str]:
         line_len = len(line) + 1
         if current_len + line_len > max_chars and current:
             chunks.append("\n".join(current))
-            current = []
-            current_len = 0
+            if overlap > 0:
+                overlap_text = "\n".join(current)[-overlap:]
+                current = [overlap_text] if overlap_text else []
+                current_len = len(overlap_text)
+            else:
+                current = []
+                current_len = 0
         current.append(line)
         current_len += line_len
     if current:
@@ -53,7 +58,11 @@ def build_index(config: AgentConfig) -> None:
         )
 
     for file_path in iter_text_files(config.context_dir):
-        chunks = chunk_text(file_path.read_text(encoding="utf-8", errors="ignore"))
+        chunks = chunk_text(
+            file_path.read_text(encoding="utf-8", errors="ignore"),
+            max_chars=config.chunk_size,
+            overlap=config.chunk_overlap,
+        )
         texts.extend(chunks)
         sources.extend([str(file_path)] * len(chunks))
 
@@ -81,7 +90,7 @@ def load_index(config: AgentConfig) -> faiss.IndexFlatL2:
     return faiss.read_index(str(config.index_path))
 
 
-def retrieve(config: AgentConfig, query: str, k: int = 4) -> List[RetrievedChunk]:
+def retrieve(config: AgentConfig, query: str, k: int | None = None) -> List[RetrievedChunk]:
     index = load_index(config)
     if not config.store_path.exists():
         raise FileNotFoundError("Stored chunks missing. Rebuild the RAG index.")
@@ -98,7 +107,10 @@ def retrieve(config: AgentConfig, query: str, k: int = 4) -> List[RetrievedChunk
 
     model = SentenceTransformer(config.embedding_model)
     query_vec = model.encode([query], convert_to_numpy=True)
-    scores, indices = index.search(np.array(query_vec, dtype=np.float32), k)
+    search_k = k if k is not None else config.retrieval_k
+    scores, indices = index.search(
+        np.array(query_vec, dtype=np.float32), search_k
+    )
 
     results: List[RetrievedChunk] = []
     for score, idx in zip(scores[0], indices[0]):
