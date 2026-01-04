@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, List, Sequence
@@ -71,28 +72,33 @@ def build_index(config: AgentConfig) -> None:
     texts: List[str] = []
     sources: List[str] = []
 
-    roots: List[Path] = []
-    for code_dir in config.code_dirs:
-        candidate = Path(code_dir)
-        if candidate.exists():
-            roots.append(candidate)
-    if config.context_dir.exists():
-        roots.append(config.context_dir)
+    repo_root = Path(".").resolve()
+    git_files = _git_tracked_files(repo_root)
+    source_files: List[Path] = []
+    exclude_set = set(DEFAULT_EXCLUDE_DIRS)
+    for rel_path in git_files:
+        full_path = repo_root / rel_path
+        if any(part in exclude_set for part in full_path.parts):
+            continue
+        if full_path.is_file() and full_path.suffix.lower() not in {".png", ".jpg", ".jpeg", ".gif", ".mp4", ".mov", ".zip"}:
+            source_files.append(full_path)
 
-    if not roots:
+    if config.context_dir.exists():
+        source_files.extend(list(iter_text_files(config.context_dir)))
+
+    if not source_files:
         raise FileNotFoundError(
-            "No source directories found to index. Configure code_dirs or create a .context directory."
+            "No source files found to index. Ensure this is a git repository and files are tracked."
         )
 
-    for root in roots:
-        for file_path in iter_text_files(root):
-            chunks = chunk_text(
-                file_path.read_text(encoding="utf-8", errors="ignore"),
-                max_chars=config.chunk_size,
-                overlap=config.chunk_overlap,
-            )
-            texts.extend(chunks)
-            sources.extend([str(file_path)] * len(chunks))
+    for file_path in source_files:
+        chunks = chunk_text(
+            file_path.read_text(encoding="utf-8", errors="ignore"),
+            max_chars=config.chunk_size,
+            overlap=config.chunk_overlap,
+        )
+        texts.extend(chunks)
+        sources.extend([str(file_path)] * len(chunks))
 
     if not texts:
         raise ValueError("No text files found in the context directory.")
@@ -110,6 +116,21 @@ def build_index(config: AgentConfig) -> None:
         safe_text = text.replace("\n", "\\n")
         records.append(f"{source}\t{safe_text}")
     payload_path.write_text("\n".join(records))
+
+
+def _git_tracked_files(repo_root: Path) -> List[Path]:
+    result = subprocess.run(
+        ["git", "ls-files"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"Failed to list git-tracked files: {result.stderr.strip() or result.stdout.strip()}"
+        )
+    return [Path(line.strip()) for line in result.stdout.splitlines() if line.strip()]
 
 
 def load_index(config: AgentConfig) -> faiss.IndexFlatL2:

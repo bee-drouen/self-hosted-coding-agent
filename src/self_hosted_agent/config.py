@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import Optional
 
 import json
 
@@ -37,7 +37,6 @@ class RunPodSettings:
 class AgentConfig:
     base_dir: Path = DEFAULT_BASE_DIR
     context_dir: Path = DEFAULT_CONTEXT_DIR
-    code_dirs: List[str] = field(default_factory=lambda: ["."], repr=False)
     index_path: Path = DEFAULT_INDEX_PATH
     store_path: Path = DEFAULT_STORE_PATH
     chat_log_path: Path = DEFAULT_CHAT_LOG_PATH
@@ -72,7 +71,6 @@ def load_config(path: Path = DEFAULT_CONFIG_PATH) -> AgentConfig:
     return AgentConfig(
         base_dir=Path(data.get("base_dir", DEFAULT_BASE_DIR)),
         context_dir=Path(data.get("context_dir", DEFAULT_CONTEXT_DIR)),
-        code_dirs=data.get("code_dirs", ["."]),
         index_path=Path(data.get("index_path", DEFAULT_INDEX_PATH)),
         store_path=Path(data.get("store_path", DEFAULT_STORE_PATH)),
         chat_log_path=Path(data.get("chat_log_path", DEFAULT_CHAT_LOG_PATH)),
@@ -96,7 +94,6 @@ def save_config(config: AgentConfig, path: Path = DEFAULT_CONFIG_PATH) -> None:
     serializable = {
         "base_dir": str(config.base_dir),
         "context_dir": str(config.context_dir),
-        "code_dirs": config.code_dirs,
         "index_path": str(config.index_path),
         "store_path": str(config.store_path),
         "chat_log_path": str(config.chat_log_path),

@@ -74,4 +74,4 @@ CLI utilities for orchestrating a self-hosted coding agent that runs on RunPod, 
   - `system_prompt`: pushes grounded, stepwise answers with file-path citations.
   - `temperature`/`top_p` set low (0.2/0.9) for focused outputs; `max_tokens` 2048 for longer replies.
   - `chunk_size` 1200 with `chunk_overlap` 200 and `retrieval_k` 8 to improve recall across large codebases like 100K+ line monorepos.
-  - `code_dirs` lets you specify which project directories to index; by default the whole repo plus `.context` (when it exists) are indexed. Re-run `index` whenever code changes materially.
+  - Indexing uses all git-tracked files in the repo plus `.context` (when present); re-run `index` whenever code changes materially.
