@@ -8,7 +8,7 @@ CLI utilities for orchestrating a self-hosted coding agent that runs on RunPod, 
 - Local-first chat logs and RAG index; nothing is uploaded except what you explicitly send to the model.
 - Default MCP server definitions for local terminal and filesystem control.
 - Automatic idle shutdown window (30 minutes by default) so pods do not stay alive when unused.
-- High-quality defaults for large codebases: larger RAG chunks with overlap, more retrieved neighbors, low-temperature generation, and a guiding system prompt that encourages grounded, stepwise answers.
+- High-quality defaults for large codebases: code-aware embeddings, hybrid dense+BM25 retrieval with reranking, larger RAG chunks with overlap, more retrieved neighbors, low-temperature generation, and a guiding system prompt that encourages grounded, stepwise answers (including workspace alias resolution like `@services/...`).
 
 ## Quickstart
 
@@ -34,7 +34,7 @@ CLI utilities for orchestrating a self-hosted coding agent that runs on RunPod, 
 
    You will be prompted for your RunPod API key and optional template ID/image/machine type.
 
-5. Build the local RAG index from the repository (and `.context` if present):
+5. Build the local RAG index from the repository (git-tracked files) and `.context` if present:
 
    ```bash
    poetry run self-hosted-agent index
@@ -71,7 +71,9 @@ CLI utilities for orchestrating a self-hosted coding agent that runs on RunPod, 
 - The agent assumes a model endpoint compatible with the OpenAI Chat Completions API (for example, an open-source model served on the RunPod workstation). Update `model_endpoint` and `model_name` in `.agent_state/config.json` as needed.
 - Quality-oriented defaults (tunable in `.agent_state/config.json`):
   - `model_name`: `qwen2.5-coder-32b-instruct` (strong reasoning for large repos).
-  - `system_prompt`: pushes grounded, stepwise answers with file-path citations.
+  - `embedding_model`: `jinaai/jina-embeddings-v2-base-code` (code-aware dense embeddings).
+  - `system_prompt`: pushes grounded, stepwise answers with file-path citations and reminds the model to resolve workspace aliases like `@services/...`.
   - `temperature`/`top_p` set low (0.2/0.9) for focused outputs; `max_tokens` 2048 for longer replies.
-  - `chunk_size` 1200 with `chunk_overlap` 200 and `retrieval_k` 8 to improve recall across large codebases like 100K+ line monorepos.
-  - Indexing uses all git-tracked files in the repo plus `.context` (when present); re-run `index` whenever code changes materially.
+  - Hybrid retrieval: dense (FAISS) + BM25 with weights (`dense_weight`/`bm25_weight`) and `retrieval_k` fan-out.
+  - Chunking defaults: general 1200/200; `.tsx` chunks are larger (1800/250) to keep JSX blocks intact; `.md` is smaller (900/200); `.ts` stays at 1200/200.
+  - Indexing uses all git-tracked files in the repo plus `.context` (when present); re-run `index` whenever code changes materially. Incremental rebuilds reuse unchanged embeddings when chunking parameters and embedding model stay the same.
