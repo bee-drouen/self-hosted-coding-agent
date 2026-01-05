@@ -1,0 +1,8 @@
+.agent_state/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+.venv/
+.idea/
+.DS_Store
+*.pyc
