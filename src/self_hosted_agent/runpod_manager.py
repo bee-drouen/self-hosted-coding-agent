@@ -52,68 +52,75 @@ def create_pod(config: AgentConfig, template_id: str | None = None) -> PodStatus
         raise RunPodError("RunPod settings missing from config.")
 
     settings = config.runpod
+    
+    # Updated mutation to match current RunPod API
     mutation = """
-    mutation PodCreate($input: PodCreateInput!){
-      podCreate(input: $input){
-        id
-        status
-        name
-        imageName
-        machineId
-        ports{
-          ip
-          isIpPublic
-          privatePort
-          publicPort
+    mutation {
+      podFindAndDeployOnDemand(
+        input: {
+          cloudType: SECURE
+          gpuCount: 1
+          volumeInGb: 50
+          containerDiskInGb: 50
+          minVcpuCount: 2
+          minMemoryInGb: 15
+          gpuTypeId: "%s"
+          name: "self-hosted-coding-agent"
+          imageName: "%s"
+          dockerArgs: ""
+          ports: "8888/http,22/tcp"
+          volumeMountPath: "/workspace"
+          env: [
+            {key: "JUPYTER_PASSWORD", value: "runpod"}
+          ]
         }
-        rpcProxy{
-          url
+      ) {
+        id
+        imageName
+        env
+        machineId
+        machine {
+          podHostId
         }
       }
     }
-    """
-    variables = {
-        "input": {
-            "templateId": template_id or settings.template_id,
-            "name": "self-hosted-coding-agent",
-            "cloudType": settings.cloud_type,
-            "machineType": settings.machine_type,
-            "imageName": settings.image_name,
-        }
-    }
-    result = _post(settings.api_key, mutation, variables)
-    pod = result["podCreate"]
-    endpoint_url = None
-    if pod.get("rpcProxy"):
-        endpoint_url = pod["rpcProxy"].get("url")
-    ssh_command = None
-    for port in pod.get("ports", []):
-        if port.get("isIpPublic"):
-            ssh_command = f"ssh root@{port['ip']} -p {port['publicPort']}"
-            break
-
+    """ % (settings.machine_type, settings.image_name)
+    
+    # Note: The new API requires gpuTypeId instead of machineType
+    # Common GPU type IDs:
+    # "NVIDIA RTX A6000" -> you'll need to get the actual ID
+    # You may need to query available GPU types first
+    
+    result = _post(settings.api_key, mutation, {})
+    pod = result["podFindAndDeployOnDemand"]
+    
+    # Wait a moment for the pod to initialize
+    import time
+    time.sleep(2)
+    
+    # Get the full pod details
+    pod_details = get_pod_status_by_id(config, pod["id"])
+    
     settings.pod_id = pod["id"]
-    settings.endpoint_url = endpoint_url
-    settings.ssh_command = ssh_command
+    settings.endpoint_url = pod_details.endpoint_url
+    settings.ssh_command = pod_details.ssh_command
     save_config(config)
     _touch_activity(config.base_dir)
-    return PodStatus(
-        id=pod["id"],
-        status=pod["status"],
-        endpoint_url=endpoint_url,
-        ssh_command=ssh_command,
-    )
+    
+    return pod_details
 
 
 def terminate_pod(config: AgentConfig) -> None:
     if not config.runpod or not config.runpod.pod_id:
         raise RunPodError("No pod is currently tracked in the config.")
+    
     mutation = """
-    mutation PodTerminate($podId: String!){
-      podTerminate(input:{podId:$podId})
+    mutation {
+      podTerminate(input: {podId: "%s"})
     }
-    """
-    _post(config.runpod.api_key, mutation, {"podId": config.runpod.pod_id})
+    """ % config.runpod.pod_id
+    
+    _post(config.runpod.api_key, mutation, {})
     config.runpod.pod_id = None
     config.runpod.endpoint_url = None
     config.runpod.ssh_command = None
@@ -123,38 +130,64 @@ def terminate_pod(config: AgentConfig) -> None:
 def get_pod_status(config: AgentConfig) -> PodStatus:
     if not config.runpod or not config.runpod.pod_id:
         raise RunPodError("No pod is currently tracked in the config.")
+    return get_pod_status_by_id(config, config.runpod.pod_id)
+
+
+def get_pod_status_by_id(config: AgentConfig, pod_id: str) -> PodStatus:
+    if not config.runpod:
+        raise RunPodError("RunPod settings missing from config.")
+    
     query = """
-    query PodFind($podId: String!){
-      pod(input:{podId:$podId}){
+    query {
+      pod(input: {podId: "%s"}) {
         id
-        status
-        imageName
-        machineId
-        ports{
-          ip
-          isIpPublic
-          privatePort
-          publicPort
+        name
+        runtime {
+          uptimeInSeconds
+          ports {
+            ip
+            isIpPublic
+            privatePort
+            publicPort
+            type
+          }
+          gpus {
+            id
+            gpuUtilPercent
+            memoryUtilPercent
+          }
+          container {
+            cpuPercent
+            memoryPercent
+          }
         }
-        rpcProxy{
-          url
+        machineId
+        machine {
+          gpuDisplayName
         }
       }
     }
-    """
-    data = _post(config.runpod.api_key, query, {"podId": config.runpod.pod_id})
+    """ % pod_id
+    
+    data = _post(config.runpod.api_key, query, {})
     pod = data["pod"]
+    
     endpoint_url = None
-    if pod.get("rpcProxy"):
-        endpoint_url = pod["rpcProxy"].get("url")
     ssh_command = None
-    for port in pod.get("ports", []):
-        if port.get("isIpPublic"):
-            ssh_command = f"ssh root@{port['ip']} -p {port['publicPort']}"
-            break
+    
+    if pod.get("runtime") and pod["runtime"].get("ports"):
+        for port in pod["runtime"]["ports"]:
+            if port.get("isIpPublic"):
+                if port.get("privatePort") == 8888:
+                    endpoint_url = f"http://{port['ip']}:{port['publicPort']}"
+                elif port.get("privatePort") == 22:
+                    ssh_command = f"ssh root@{port['ip']} -p {port['publicPort']}"
+    
+    status = "running" if pod.get("runtime") else "pending"
+    
     return PodStatus(
         id=pod["id"],
-        status=pod["status"],
+        status=status,
         endpoint_url=endpoint_url,
         ssh_command=ssh_command,
     )

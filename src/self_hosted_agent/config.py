@@ -28,7 +28,7 @@ DEFAULT_SYSTEM_PROMPT = (
 class RunPodSettings:
     api_key: str
     template_id: Optional[str] = None
-    image_name: str = "runpod/ai-workstation"
+    image_name: str = "runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04"
     machine_type: str = "NVIDIA RTX A6000"
     cloud_type: str = "SECURE"
     idle_timeout_minutes: int = 30

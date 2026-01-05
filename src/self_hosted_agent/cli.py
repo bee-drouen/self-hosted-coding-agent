@@ -62,10 +62,10 @@ def init_config(
         None, help="Optional RunPod template ID for the workstation."
     ),
     image_name: str = typer.Option(
-        "runpod/ai-workstation", help="Docker image for the RunPod workspace."
+        "runpod/pytorch:2.1.0-py3.10-cuda11.8.0-devel-ubuntu22.04", help="Docker image for the RunPod workspace."
     ),
     machine_type: str = typer.Option(
-        "NVIDIA RTX A6000", help="Machine type for the RunPod pod."
+        "NVIDIA RTX A5000", help="Machine type for the RunPod pod."
     ),
     context_dir: Path = typer.Option(
         Path(".context"),
